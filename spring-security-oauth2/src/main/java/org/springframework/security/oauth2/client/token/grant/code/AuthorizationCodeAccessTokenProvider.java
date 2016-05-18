@@ -65,7 +65,7 @@ import org.springframework.web.client.ResponseExtractor;
 
 /**
  * Provider for obtaining an oauth2 access token by using an authorization code.
- * 
+ *
  * @author Ryan Heaton
  * @author Dave Syer
  */
@@ -78,10 +78,10 @@ public class AuthorizationCodeAccessTokenProvider extends OAuth2AccessTokenSuppo
 	private RequestEnhancer authorizationRequestEnhancer = new DefaultRequestEnhancer();
 
 	private boolean stateMandatory = true;
-	
+
 	/**
 	 * Flag to say that the use of state parameter is mandatory.
-	 * 
+	 *
 	 * @param stateMandatory the flag value (default true)
 	 */
 	public void setStateMandatory(boolean stateMandatory) {
@@ -98,7 +98,7 @@ public class AuthorizationCodeAccessTokenProvider extends OAuth2AccessTokenSuppo
 
 	/**
 	 * Prefix for scope approval parameters.
-	 * 
+	 *
 	 * @param scopePrefix
 	 */
 	public void setScopePrefix(String scopePrefix) {
@@ -323,7 +323,7 @@ public class AuthorizationCodeAccessTokenProvider extends OAuth2AccessTokenSuppo
 
 	}
 
-	private UserRedirectRequiredException getRedirectForAuthorization(AuthorizationCodeResourceDetails resource,
+	protected UserRedirectRequiredException getRedirectForAuthorization(AuthorizationCodeResourceDetails resource,
 			AccessTokenRequest request) {
 
 		// we don't have an authorization code yet. So first get that.
