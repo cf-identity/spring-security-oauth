@@ -36,7 +36,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -63,9 +62,11 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResponseExtractor;
 
+import static java.util.Arrays.asList;
+
 /**
  * Provider for obtaining an oauth2 access token by using an authorization code.
- * 
+ *
  * @author Ryan Heaton
  * @author Dave Syer
  */
@@ -78,10 +79,10 @@ public class AuthorizationCodeAccessTokenProvider extends OAuth2AccessTokenSuppo
 	private RequestEnhancer authorizationRequestEnhancer = new DefaultRequestEnhancer();
 
 	private boolean stateMandatory = true;
-	
+
 	/**
 	 * Flag to say that the use of state parameter is mandatory.
-	 * 
+	 *
 	 * @param stateMandatory the flag value (default true)
 	 */
 	public void setStateMandatory(boolean stateMandatory) {
@@ -98,7 +99,7 @@ public class AuthorizationCodeAccessTokenProvider extends OAuth2AccessTokenSuppo
 
 	/**
 	 * Prefix for scope approval parameters.
-	 * 
+	 *
 	 * @param scopePrefix
 	 */
 	public void setScopePrefix(String scopePrefix) {
@@ -327,14 +328,14 @@ public class AuthorizationCodeAccessTokenProvider extends OAuth2AccessTokenSuppo
 			AccessTokenRequest request) {
 
 		// we don't have an authorization code yet. So first get that.
-		TreeMap<String, String> requestParameters = new TreeMap<String, String>();
-		requestParameters.put("response_type", "code"); // oauth2 spec, section 3
-		requestParameters.put("client_id", resource.getClientId());
+		MultiValueMap<String, String> requestParameters = new LinkedMultiValueMap<String, String>();
+		requestParameters.put("response_type", asList("code")); // oauth2 spec, section 3
+		requestParameters.put("client_id", asList(resource.getClientId()));
 		// Client secret is not required in the initial authorization request
 
 		String redirectUri = resource.getRedirectUri(request);
 		if (redirectUri != null) {
-			requestParameters.put("redirect_uri", redirectUri);
+			requestParameters.put("redirect_uri", asList(redirectUri));
 		}
 
 		if (resource.isScoped()) {
@@ -352,11 +353,13 @@ public class AuthorizationCodeAccessTokenProvider extends OAuth2AccessTokenSuppo
 				}
 			}
 
-			requestParameters.put("scope", builder.toString());
+			requestParameters.put("scope", asList(builder.toString()));
 		}
 
+		authorizationRequestEnhancer.enhance(request, resource, requestParameters, new HttpHeaders());
+
 		UserRedirectRequiredException redirectException = new UserRedirectRequiredException(
-				resource.getUserAuthorizationUri(), requestParameters);
+				resource.getUserAuthorizationUri(), requestParameters.toSingleValueMap());
 
 		String stateKey = stateKeyGenerator.generateKey(resource);
 		redirectException.setStateKey(stateKey);
