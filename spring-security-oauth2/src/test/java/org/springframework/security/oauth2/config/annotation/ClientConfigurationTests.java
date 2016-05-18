@@ -1,17 +1,18 @@
 /*
  * Copyright 2006-2011 the original author or authors.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  */
 package org.springframework.security.oauth2.config.annotation;
 
+import java.util.Arrays;
 import javax.annotation.Resource;
 
 import org.hamcrest.CoreMatchers;
@@ -23,12 +24,17 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Scope;
 import org.springframework.context.annotation.ScopedProxyMode;
+import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.oauth2.client.DefaultOAuth2ClientContext;
 import org.springframework.security.oauth2.client.OAuth2RestOperations;
 import org.springframework.security.oauth2.client.OAuth2RestTemplate;
 import org.springframework.security.oauth2.client.filter.OAuth2ClientContextFilter;
+import org.springframework.security.oauth2.client.resource.OAuth2ProtectedResourceDetails;
+import org.springframework.security.oauth2.client.token.AccessTokenProviderChain;
 import org.springframework.security.oauth2.client.token.AccessTokenRequest;
+import org.springframework.security.oauth2.client.token.DefaultRequestEnhancer;
+import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeAccessTokenProvider;
 import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeResourceDetails;
 import org.springframework.security.oauth2.config.annotation.web.configuration.OAuth2ClientConfiguration;
 import org.springframework.stereotype.Controller;
@@ -36,14 +42,17 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+
 /**
  * @author Dave Syer
- * 
+ *
  */
 public class ClientConfigurationTests {
 
@@ -57,8 +66,10 @@ public class ClientConfigurationTests {
 		mvc.perform(MockMvcRequestBuilders.get("/photos"))
 				.andExpect(MockMvcResultMatchers.status().isFound())
 				.andExpect(
-						MockMvcResultMatchers.header().string("Location",
-								CoreMatchers.startsWith("http://example.com/authorize")));
+						header().string("Location",
+								CoreMatchers.startsWith("http://example.com/authorize")))
+				.andExpect(header().string("Location", CoreMatchers.containsString("response_type")))
+				.andExpect(header().string("Location", CoreMatchers.containsString("response_type=code%20id_token")));
 		context.close();
 	}
 
@@ -86,7 +97,23 @@ public class ClientConfigurationTests {
 			resource.setClientId("client");
 			resource.setAccessTokenUri("http://example.com/token");
 			resource.setUserAuthorizationUri("http://example.com/authorize");
-			return new OAuth2RestTemplate(resource, new DefaultOAuth2ClientContext(accessTokenRequest));
+			AuthorizationCodeAccessTokenProvider accessTokenProvider = new AuthorizationCodeAccessTokenProvider();
+			accessTokenProvider.setAuthorizationRequestEnhancer(new DefaultRequestEnhancer() {
+				@Override
+				public void enhance(AccessTokenRequest request, OAuth2ProtectedResourceDetails resource, MultiValueMap<String, String> form, HttpHeaders headers) {
+					super.enhance(request, resource, form, headers);
+					String responseType = form.getFirst("response_type");
+					if (!responseType.contains("id_token")) {
+						responseType = responseType + " id_token";
+						form.set("response_type", responseType);
+					}
+				}
+			});
+
+			AccessTokenProviderChain provider = new AccessTokenProviderChain(Arrays.asList(accessTokenProvider));
+			OAuth2RestTemplate template = new OAuth2RestTemplate(resource, new DefaultOAuth2ClientContext(accessTokenRequest));
+			template.setAccessTokenProvider(provider);
+			return template;
 		}
 
 	}
